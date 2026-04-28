@@ -4,6 +4,8 @@
 #include "test_granularity_rdtsc.hh"
 #include "test_rdtsc_step.hh"
 #include "test_rdtsc_step_mt.hh"
+#include "test_rdtscp_step.hh"
+#include "test_rdtscp_step_mt.hh"
 
 #include <chrono>
 #include <cmath>
@@ -97,6 +99,22 @@ int main(int argc, char** argv)
         run_test_rdtsc_step_mt(csv);
         csv.close();
         std::println("wrote {}", std::filesystem::absolute("result_rdtsc_step_mt.csv").string());
+    }
+
+    if (requested == "all" || requested == "rdtscp_step")
+    {
+        std::ofstream csv("result_rdtscp_step.csv");
+        run_test_rdtscp_step(csv);
+        csv.close();
+        std::println("wrote {}", std::filesystem::absolute("result_rdtscp_step.csv").string());
+    }
+
+    if (requested == "all" || requested == "rdtscp_step_mt")
+    {
+        std::ofstream csv("result_rdtscp_step_mt.csv");
+        run_test_rdtscp_step_mt(csv);
+        csv.close();
+        std::println("wrote {}", std::filesystem::absolute("result_rdtscp_step_mt.csv").string());
     }
 
     auto const elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();

@@ -30,6 +30,7 @@ macOS only: `mach_absolute_time`
 
 Hardware cycle counters (architecture-dependent):
 - x86 / x64: `hw::rdtsc` — frequency calibrated against `steady_clock` once at startup
+- x86 / x64: `hw::rdtscp` — like rdtsc but partially serializing and additionally returns a processor signature
 - arm64: `hw::cntvct_el0` — frequency from `cntfrq_el0`
 
 ## Tests
@@ -39,6 +40,8 @@ Hardware cycle counters (architecture-dependent):
 - **C. Calls per change** — the inverse: count how many `now()` calls fit between successive value changes. Same 10 000 / 1 s budget. Plotted as a ridge histogram on a log-count axis. Output: `chart_calls_per_change.svg`.
 - **D. rdtsc step** — special micro-test: a tight loop reads the cycle counter 8 times unrolled into local variables, recording the 7 pairwise cycle deltas. Reveals the raw step distribution of the hardware counter with no instrumentation in between. Plotted as a single linear-x histogram. Output: `chart_rdtsc_step.svg`. Skipped on architectures without a hardware cycle counter.
 - **E. rdtsc step (multithreaded)** — same 8-unrolled read pattern, but launched on `hardware_concurrency()` threads simultaneously (synchronized start via spinlock; per-thread steady-clock start/end timestamps). After joining, the shared-active interval is computed; each thread's 100 000-entry buffer is trimmed to that interval by linear interpolation; pairwise diffs are emitted with a `tight`/`wraparound` flag. Plotted as two overlaid histograms. Also prints a value-occurrence frequency table (how many distinct rdtsc values were observed once, twice, thrice, … across all threads in the shared interval — reveals whether monotonicity holds across cores). Output: `chart_rdtsc_step_mt.svg`. Skipped on architectures without a hardware cycle counter.
+- **F. rdtscp step** — same as test D but using `rdtscp` (partially serializing variant of rdtsc). Output: `chart_rdtscp_step.svg`. Skipped on non-x86.
+- **G. rdtscp step (multithreaded)** — same as test E but using `rdtscp`, additionally recording the processor signature returned by each call. The frequency table is keyed on the `(cycles, procid)` pair — empirical check of whether that pair is unique across all calls in the shared interval. Output: `chart_rdtscp_step_mt.svg`. Skipped on non-x86.
 
 Before any measurement, the binary runs ~300 ms of single-threaded `sin` work to nudge the CPU out of low-power states and prints a "warmup witness" value (so the work can't be elided).
 

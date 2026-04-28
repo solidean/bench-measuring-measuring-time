@@ -159,6 +159,10 @@ inline double mach_scale()
 
 inline uint64_t now_cycles() { return cycles_now(); }
 
+#ifdef BENCH_TIME_HAS_RDTSCP
+inline uint64_t now_rdtscp() { return rdtscp_now(); }
+#endif
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 inline std::vector<TimeMethod>& methods_storage()
@@ -217,6 +221,9 @@ inline void init_time_methods()
         m.push_back({"hw::rdtsc", "#ec407a", &now_cycles, 1.0 / cps});
 #elif defined(_M_ARM64) || defined(__aarch64__)
         m.push_back({"hw::cntvct_el0", "#ec407a", &now_cycles, 1.0 / cps});
+#endif
+#ifdef BENCH_TIME_HAS_RDTSCP
+        m.push_back({"hw::rdtscp", "#f06292", &now_rdtscp, 1.0 / cps});
 #endif
     }
 }

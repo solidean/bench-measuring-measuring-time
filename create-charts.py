@@ -213,58 +213,7 @@ def render_calls_per_change(csv_path: Path):
     )
 
 
-def render_rdtsc_step_mt(csv_path: Path):
-    out_dir = csv_path.parent
-    df = pd.read_csv(csv_path, keep_default_na=False)
-
-    upper = 100.0
-    bins = np.arange(0, upper + 1)
-
-    tight = df[df["tight"] == 1]["diff"].astype(float).to_numpy()
-    wrap = df[df["tight"] == 0]["diff"].astype(float).to_numpy()
-
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.hist(
-        tight,
-        bins=bins,
-        density=True,
-        color="#ec407a",
-        edgecolor=BG,
-        linewidth=0.5,
-        alpha=0.65,
-        label="tight rdtsc (within 8-unroll)",
-    )
-    ax.hist(
-        wrap,
-        bins=bins,
-        density=True,
-        color="#42a5f5",
-        edgecolor=BG,
-        linewidth=0.5,
-        alpha=0.65,
-        label="loop wraparound (between 8-unrolls)",
-    )
-
-    for spine in ("right", "top"):
-        ax.spines[spine].set_visible(False)
-    ax.spines["left"].set_color(GRID)
-    ax.spines["bottom"].set_color(GRID)
-    ax.grid(True, axis="y", color=GRID, linewidth=0.5)
-    ax.set_axisbelow(True)
-    ax.set_xlim(0, upper)
-    ax.set_xlabel("Cycles between consecutive rdtsc reads")
-    ax.set_ylabel("Relative frequency")
-    ax.set_title("rdtsc step distribution (multithreaded, shared interval)")
-    ax.legend(facecolor=BG, edgecolor=GRID, labelcolor=FG)
-
-    fig.tight_layout()
-    out = out_dir / "chart_rdtsc_step_mt.svg"
-    fig.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved {out.name}")
-
-
-def render_rdtsc_step(csv_path: Path):
+def _draw_step(csv_path: Path, *, instr_name: str, out_name: str, unroll: int):
     out_dir = csv_path.parent
     df = pd.read_csv(csv_path, keep_default_na=False)
     cycles = df["cycles"].astype(float).to_numpy()
@@ -289,15 +238,86 @@ def render_rdtsc_step(csv_path: Path):
     ax.grid(True, axis="y", color=GRID, linewidth=0.5)
     ax.set_axisbelow(True)
     ax.set_xlim(0, upper)
-    ax.set_xlabel("Cycles between consecutive rdtsc reads")
+    ax.set_xlabel(f"Cycles between consecutive {instr_name} reads")
     ax.set_ylabel("Relative frequency")
-    ax.set_title("rdtsc step distribution (8-unrolled, 7 deltas per iter)")
+    ax.set_title(f"{instr_name} step distribution ({unroll}-unrolled, {unroll - 1} deltas per iter)")
 
     fig.tight_layout()
-    out = out_dir / "chart_rdtsc_step.svg"
+    out = out_dir / out_name
     fig.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {out.name}")
+
+
+def _draw_step_mt(csv_path: Path, *, instr_name: str, out_name: str, unroll: int):
+    out_dir = csv_path.parent
+    df = pd.read_csv(csv_path, keep_default_na=False)
+
+    if df.empty:
+        print(f"{csv_path.name} has no data — skipping (likely empty shared interval)")
+        return
+
+    upper = 100.0
+    bins = np.arange(0, upper + 1)
+
+    tight = df[df["tight"] == 1]["diff"].astype(float).to_numpy()
+    wrap = df[df["tight"] == 0]["diff"].astype(float).to_numpy()
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.hist(
+        tight,
+        bins=bins,
+        density=True,
+        color="#ec407a",
+        edgecolor=BG,
+        linewidth=0.5,
+        alpha=0.65,
+        label=f"tight {instr_name} (within {unroll}-unroll)",
+    )
+    ax.hist(
+        wrap,
+        bins=bins,
+        density=True,
+        color="#42a5f5",
+        edgecolor=BG,
+        linewidth=0.5,
+        alpha=0.65,
+        label=f"loop wraparound (between {unroll}-unrolls)",
+    )
+
+    for spine in ("right", "top"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["left"].set_color(GRID)
+    ax.spines["bottom"].set_color(GRID)
+    ax.grid(True, axis="y", color=GRID, linewidth=0.5)
+    ax.set_axisbelow(True)
+    ax.set_xlim(0, upper)
+    ax.set_xlabel(f"Cycles between consecutive {instr_name} reads")
+    ax.set_ylabel("Relative frequency")
+    ax.set_title(f"{instr_name} step distribution (multithreaded, shared interval)")
+    ax.legend(facecolor=BG, edgecolor=GRID, labelcolor=FG)
+
+    fig.tight_layout()
+    out = out_dir / out_name
+    fig.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {out.name}")
+
+
+def render_rdtsc_step(csv_path: Path):
+    _draw_step(csv_path, instr_name="rdtsc", out_name="chart_rdtsc_step.svg", unroll=8)
+
+
+def render_rdtscp_step(csv_path: Path):
+    _draw_step(csv_path, instr_name="rdtscp", out_name="chart_rdtscp_step.svg", unroll=4)
+
+
+def render_rdtsc_step_mt(csv_path: Path):
+    _draw_step_mt(csv_path, instr_name="rdtsc", out_name="chart_rdtsc_step_mt.svg", unroll=8)
+
+
+def render_rdtscp_step_mt(csv_path: Path):
+    _draw_step_mt(csv_path, instr_name="rdtscp", out_name="chart_rdtscp_step_mt.svg", unroll=4)
 
 
 # ── Dispatcher ──────────────────────────────────────────────────────────────
@@ -308,6 +328,8 @@ RENDERERS = {
     "calls_per_change": render_calls_per_change,
     "rdtsc_step": render_rdtsc_step,
     "rdtsc_step_mt": render_rdtsc_step_mt,
+    "rdtscp_step": render_rdtscp_step,
+    "rdtscp_step_mt": render_rdtscp_step_mt,
 }
 
 

@@ -5,6 +5,7 @@
 
 #if defined(_M_X64) || defined(__x86_64__) || defined(_M_IX86) || defined(__i386__)
 #define BENCH_TIME_HAS_RDTSC 1
+#define BENCH_TIME_HAS_RDTSCP 1
 #if defined(_MSC_VER)
 #include <intrin.h>
 #else
@@ -26,6 +27,19 @@ inline uint64_t cycles_now()
     return 0;
 #endif
 }
+
+#ifdef BENCH_TIME_HAS_RDTSCP
+inline uint64_t rdtscp_now()
+{
+    unsigned int aux;
+    return __rdtscp(&aux);
+}
+
+inline uint64_t rdtscp_now_aux(unsigned int* aux_out)
+{
+    return __rdtscp(aux_out);
+}
+#endif
 
 inline double cycles_per_second()
 {
