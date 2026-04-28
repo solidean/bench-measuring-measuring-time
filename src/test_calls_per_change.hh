@@ -10,9 +10,9 @@
 #include <print>
 #include <vector>
 
-inline void run_test_granularity(std::ofstream& csv)
+inline void run_test_calls_per_change(std::ofstream& csv)
 {
-    csv << "method,color,latency_ns,sample_idx\n";
+    csv << "method,color,calls,sample_idx\n";
 
     using clk = std::chrono::steady_clock;
     constexpr int target_samples = 10'000;
@@ -20,15 +20,15 @@ inline void run_test_granularity(std::ofstream& csv)
     constexpr uint64_t max_inner = 1'000'000'000ull;
 
     std::vector<stats_row> all_stats;
-    std::vector<double> latencies_ns;
+    std::vector<double> calls_per_sample;
 
     for (auto const& m : time_methods())
     {
-        std::println("granularity: {}", m.name);
+        std::println("calls_per_change: {}", m.name);
         std::fflush(stdout);
 
-        latencies_ns.clear();
-        latencies_ns.reserve(target_samples);
+        calls_per_sample.clear();
+        calls_per_sample.reserve(target_samples);
 
         auto const wall_start = clk::now();
         uint64_t t_prev = m.now();
@@ -40,34 +40,32 @@ inline void run_test_granularity(std::ofstream& csv)
                 break;
 
             uint64_t t_cur = t_prev;
-            uint64_t inner = 0;
-            while (t_cur == t_prev && inner < max_inner)
+            uint64_t count = 0;
+            while (t_cur == t_prev && count < max_inner)
             {
                 t_cur = m.now();
-                ++inner;
+                ++count;
             }
-            if (inner >= max_inner)
+            if (count >= max_inner)
                 break;
 
-            // some clocks (system_clock under adjustment) can move backwards — skip
             if (t_cur < t_prev)
             {
                 t_prev = t_cur;
                 continue;
             }
 
-            double const delta_s = double(t_cur - t_prev) * m.scale_to_seconds;
-            latencies_ns.push_back(delta_s * 1e9);
+            calls_per_sample.push_back(double(count));
             t_prev = t_cur;
         }
 
-        for (size_t i = 0; i < latencies_ns.size(); ++i)
-            csv << m.name << "," << m.color << "," << latencies_ns[i] << "," << i << "\n";
+        for (size_t i = 0; i < calls_per_sample.size(); ++i)
+            csv << m.name << "," << m.color << "," << uint64_t(calls_per_sample[i]) << "," << i << "\n";
 
-        all_stats.push_back(compute_stats(m.name, latencies_ns));
-        std::println("  {} samples", latencies_ns.size());
+        all_stats.push_back(compute_stats(m.name, calls_per_sample));
+        std::println("  {} samples", calls_per_sample.size());
         std::fflush(stdout);
     }
 
-    print_summary("granularity", all_stats);
+    print_summary("calls_per_change", all_stats, &fmt_count);
 }

@@ -35,6 +35,10 @@ Hardware cycle counters (architecture-dependent):
 ## Tests
 
 - **A. Empirical granularity** — for each method, repeatedly read the clock until the value changes; record the delta. Up to 10 000 samples per method, capped at 1 s wall-clock budget. The distribution per method is plotted as a ridge histogram (`chart_granularity.svg`).
+- **B. Granularity as seen by rdtsc** — same loop as A, but the recorded latency is `(cycles_after - cycles_before) / cycles_per_second` instead of the clock's own delta. Reveals the "true" wait time independent of the clock's own resolution. Output: `chart_granularity_rdtsc.svg`. Skipped on architectures without a hardware cycle counter.
+- **C. Calls per change** — the inverse: count how many `now()` calls fit between successive value changes. Same 10 000 / 1 s budget. Plotted as a ridge histogram on a log-count axis. Output: `chart_calls_per_change.svg`.
+
+Before any measurement, the binary runs ~300 ms of single-threaded `sin` work to nudge the CPU out of low-power states and prints a "warmup witness" value (so the work can't be elided).
 
 ## Requirements
 

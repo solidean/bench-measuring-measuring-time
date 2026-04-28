@@ -45,28 +45,45 @@ def fmt_seconds(v: float) -> str:
     return f"{v:g} s"
 
 
+def fmt_count(v: float) -> str:
+    if v <= 0 or not np.isfinite(v):
+        return ""
+    if v < 1000:
+        return f"{v:g}"
+    if v < 1e6:
+        return f"{v / 1e3:g}k"
+    if v < 1e9:
+        return f"{v / 1e6:g}M"
+    return f"{v / 1e9:g}G"
+
+
 # ── Test renderers ──────────────────────────────────────────────────────────
 
 
-def render_granularity(csv_path: Path):
-    LOG10_MIN_S = -9
-    LOG10_MAX_S = -1
-    BINS_PER_DECADE = 12
-
-    out_dir = csv_path.parent
-
-    df = pd.read_csv(csv_path, keep_default_na=False)
-    df["latency_ns"] = df["latency_ns"].astype(float)
-    df["latency_s"] = df["latency_ns"] * 1e-9
-    df = df[df["latency_s"] > 0].copy()
+def _render_ridge(
+    df: pd.DataFrame,
+    out_dir: Path,
+    *,
+    title: str,
+    out_name: str,
+    value_col: str,
+    log10_min: float,
+    log10_max: float,
+    xlabel: str,
+    fmt_value,
+    bins_per_decade: int = 12,
+):
+    df = df.copy()
+    df[value_col] = df[value_col].astype(float)
+    df = df[df[value_col] > 0].copy()
 
     method_order = list(df["method"].drop_duplicates())
     method_color = {m: df[df["method"] == m]["color"].iloc[0] for m in method_order}
 
     bins = np.linspace(
-        LOG10_MIN_S,
-        LOG10_MAX_S,
-        int(round((LOG10_MAX_S - LOG10_MIN_S) * BINS_PER_DECADE)) + 1,
+        log10_min,
+        log10_max,
+        int(round((log10_max - log10_min) * bins_per_decade)) + 1,
     )
 
     g = sns.FacetGrid(
@@ -83,7 +100,7 @@ def render_granularity(csv_path: Path):
         m = data["method"].iloc[0]
         sns.histplot(
             data=data,
-            x="latency_s",
+            x=value_col,
             bins=bins,
             log_scale=(True, False),
             stat="density",
@@ -126,10 +143,10 @@ def render_granularity(csv_path: Path):
     g.figure.subplots_adjust(hspace=-0.15)
 
     bottom_ax = g.axes[-1][0]
-    bottom_ax.set_xlim(10.0**LOG10_MIN_S, 10.0**LOG10_MAX_S)
-    bottom_ax.set_xlabel("Granularity")
+    bottom_ax.set_xlim(10.0**log10_min, 10.0**log10_max)
+    bottom_ax.set_xlabel(xlabel)
     bottom_ax.xaxis.set_major_locator(ticker.LogLocator(base=10, numticks=12))
-    bottom_ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: fmt_seconds(v)))
+    bottom_ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: fmt_value(v)))
     bottom_ax.xaxis.set_minor_locator(
         ticker.LogLocator(base=10, subs=tuple(range(2, 10)), numticks=100)
     )
@@ -137,22 +154,71 @@ def render_granularity(csv_path: Path):
 
     g.set_titles("")
     g.figure.suptitle(
-        "Empirical clock granularity",
+        title,
         color=FG,
         fontsize=14,
         y=0.995,
     )
 
-    out = out_dir / "chart_granularity.svg"
+    out = out_dir / out_name
     g.figure.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
     plt.close(g.figure)
     print(f"Saved {out.name}")
+
+
+def render_granularity(csv_path: Path):
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    df["latency_s"] = df["latency_ns"].astype(float) * 1e-9
+    _render_ridge(
+        df,
+        csv_path.parent,
+        title="Empirical clock granularity",
+        out_name="chart_granularity.svg",
+        value_col="latency_s",
+        log10_min=-9,
+        log10_max=-1,
+        xlabel="Granularity",
+        fmt_value=fmt_seconds,
+    )
+
+
+def render_granularity_rdtsc(csv_path: Path):
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    df["latency_s"] = df["latency_ns"].astype(float) * 1e-9
+    _render_ridge(
+        df,
+        csv_path.parent,
+        title="Clock granularity (measured by rdtsc)",
+        out_name="chart_granularity_rdtsc.svg",
+        value_col="latency_s",
+        log10_min=-9,
+        log10_max=-1,
+        xlabel="Granularity",
+        fmt_value=fmt_seconds,
+    )
+
+
+def render_calls_per_change(csv_path: Path):
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    _render_ridge(
+        df,
+        csv_path.parent,
+        title="Calls until clock value changes",
+        out_name="chart_calls_per_change.svg",
+        value_col="calls",
+        log10_min=0,
+        log10_max=8,
+        xlabel="Calls per change",
+        fmt_value=fmt_count,
+    )
 
 
 # ── Dispatcher ──────────────────────────────────────────────────────────────
 
 RENDERERS = {
     "granularity": render_granularity,
+    "granularity_rdtsc": render_granularity_rdtsc,
+    "calls_per_change": render_calls_per_change,
 }
 
 
