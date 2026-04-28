@@ -213,12 +213,101 @@ def render_calls_per_change(csv_path: Path):
     )
 
 
+def render_rdtsc_step_mt(csv_path: Path):
+    out_dir = csv_path.parent
+    df = pd.read_csv(csv_path, keep_default_na=False)
+
+    upper = 100.0
+    bins = np.arange(0, upper + 1)
+
+    tight = df[df["tight"] == 1]["diff"].astype(float).to_numpy()
+    wrap = df[df["tight"] == 0]["diff"].astype(float).to_numpy()
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.hist(
+        tight,
+        bins=bins,
+        density=True,
+        color="#ec407a",
+        edgecolor=BG,
+        linewidth=0.5,
+        alpha=0.65,
+        label="tight rdtsc (within 8-unroll)",
+    )
+    ax.hist(
+        wrap,
+        bins=bins,
+        density=True,
+        color="#42a5f5",
+        edgecolor=BG,
+        linewidth=0.5,
+        alpha=0.65,
+        label="loop wraparound (between 8-unrolls)",
+    )
+
+    for spine in ("right", "top"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["left"].set_color(GRID)
+    ax.spines["bottom"].set_color(GRID)
+    ax.grid(True, axis="y", color=GRID, linewidth=0.5)
+    ax.set_axisbelow(True)
+    ax.set_xlim(0, upper)
+    ax.set_xlabel("Cycles between consecutive rdtsc reads")
+    ax.set_ylabel("Relative frequency")
+    ax.set_title("rdtsc step distribution (multithreaded, shared interval)")
+    ax.legend(facecolor=BG, edgecolor=GRID, labelcolor=FG)
+
+    fig.tight_layout()
+    out = out_dir / "chart_rdtsc_step_mt.svg"
+    fig.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {out.name}")
+
+
+def render_rdtsc_step(csv_path: Path):
+    out_dir = csv_path.parent
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    cycles = df["cycles"].astype(float).to_numpy()
+
+    upper = 100.0
+    bins = np.arange(0, upper + 1)
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.hist(
+        cycles,
+        bins=bins,
+        density=True,
+        color="#ec407a",
+        edgecolor=BG,
+        linewidth=0.5,
+    )
+
+    for spine in ("right", "top"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["left"].set_color(GRID)
+    ax.spines["bottom"].set_color(GRID)
+    ax.grid(True, axis="y", color=GRID, linewidth=0.5)
+    ax.set_axisbelow(True)
+    ax.set_xlim(0, upper)
+    ax.set_xlabel("Cycles between consecutive rdtsc reads")
+    ax.set_ylabel("Relative frequency")
+    ax.set_title("rdtsc step distribution (8-unrolled, 7 deltas per iter)")
+
+    fig.tight_layout()
+    out = out_dir / "chart_rdtsc_step.svg"
+    fig.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {out.name}")
+
+
 # ── Dispatcher ──────────────────────────────────────────────────────────────
 
 RENDERERS = {
     "granularity": render_granularity,
     "granularity_rdtsc": render_granularity_rdtsc,
     "calls_per_change": render_calls_per_change,
+    "rdtsc_step": render_rdtsc_step,
+    "rdtsc_step_mt": render_rdtsc_step_mt,
 }
 
 
