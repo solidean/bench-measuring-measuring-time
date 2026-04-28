@@ -2,6 +2,8 @@
 #include "test_calls_per_change.hh"
 #include "test_granularity.hh"
 #include "test_granularity_rdtsc.hh"
+#include "test_rdtsc_drift.hh"
+#include "test_rdtsc_drift_long.hh"
 #include "test_rdtsc_step.hh"
 #include "test_rdtsc_step_mt.hh"
 #include "test_rdtscp_step.hh"
@@ -115,6 +117,23 @@ int main(int argc, char** argv)
         run_test_rdtscp_step_mt(csv);
         csv.close();
         std::println("wrote {}", std::filesystem::absolute("result_rdtscp_step_mt.csv").string());
+    }
+
+    if (requested == "all" || requested == "rdtsc_drift")
+    {
+        std::ofstream csv("result_rdtsc_drift.csv");
+        run_test_rdtsc_drift(csv);
+        csv.close();
+        std::println("wrote {}", std::filesystem::absolute("result_rdtsc_drift.csv").string());
+    }
+
+    // long-running test, opt-in only — not run by "all"
+    if (requested == "rdtsc_drift_long")
+    {
+        std::ofstream csv("result_rdtsc_drift_long.csv");
+        run_test_rdtsc_drift_long(csv);
+        csv.close();
+        std::println("wrote {}", std::filesystem::absolute("result_rdtsc_drift_long.csv").string());
     }
 
     auto const elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();

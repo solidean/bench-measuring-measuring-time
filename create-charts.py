@@ -304,6 +304,87 @@ def _draw_step_mt(csv_path: Path, *, instr_name: str, out_name: str, unroll: int
     print(f"Saved {out.name}")
 
 
+def render_rdtsc_drift(csv_path: Path):
+    out_dir = csv_path.parent
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    if df.empty:
+        print(f"{csv_path.name} has no data — skipping")
+        return
+
+    diffs = np.sort(df["cycles_diff"].astype(float).to_numpy())
+    if len(diffs) > 20:
+        diffs = diffs[10:-10]
+
+    median = float(np.median(diffs))
+    # 100 ns equivalent in cycles: median cycles ~ 1 ms wall-clock,
+    # so 100 ns corresponds to median * (100e-9 / 1e-3) cycles.
+    delta_100ns = median * (100e-9 / 1e-3)
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.hist(
+        diffs,
+        bins=80,
+        density=True,
+        color="#ec407a",
+        edgecolor=BG,
+        linewidth=0.5,
+    )
+
+    ax.axvline(median, color=FG, linestyle="--", linewidth=1.2,
+               label=f"median = {median:.0f} cycles")
+    ax.axvline(median - delta_100ns, color="#42a5f5", linestyle=":", linewidth=1.5,
+               label=f"±100 ns (= ±{delta_100ns:.0f} cycles)")
+    ax.axvline(median + delta_100ns, color="#42a5f5", linestyle=":", linewidth=1.5)
+
+    for spine in ("right", "top"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["left"].set_color(GRID)
+    ax.spines["bottom"].set_color(GRID)
+    ax.grid(True, axis="y", color=GRID, linewidth=0.5)
+    ax.set_axisbelow(True)
+    ax.set_xlabel("Cycles measured during 1 ms wall-clock spin")
+    ax.set_ylabel("Relative frequency")
+    ax.set_title("rdtsc drift over 1 ms (1000 samples, 10 trimmed each end)")
+    ax.legend(facecolor=BG, edgecolor=GRID, labelcolor=FG)
+
+    fig.tight_layout()
+    out = out_dir / "chart_rdtsc_drift.svg"
+    fig.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {out.name}")
+
+
+def render_rdtsc_drift_long(csv_path: Path):
+    out_dir = csv_path.parent
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    if df.empty:
+        print(f"{csv_path.name} has no data — skipping")
+        return
+
+    times = df["time_s"].astype(float).to_numpy()
+    cps = df["cps"].astype(float).to_numpy()
+
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(times, cps, color="#ec407a", linewidth=0.4, alpha=0.8)
+
+    for spine in ("right", "top"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["left"].set_color(GRID)
+    ax.spines["bottom"].set_color(GRID)
+    ax.grid(True, color=GRID, linewidth=0.5)
+    ax.set_axisbelow(True)
+    ax.set_xlabel("Time since test start (s)")
+    ax.set_ylabel("Reported cycles / second")
+    ax.set_title(f"rdtsc long-term drift ({len(cps)} samples over {times[-1]:.0f} s)")
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v / 1e9:.4f} GHz"))
+
+    fig.tight_layout()
+    out = out_dir / "chart_rdtsc_drift_long.svg"
+    fig.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {out.name}")
+
+
 def render_rdtsc_step(csv_path: Path):
     _draw_step(csv_path, instr_name="rdtsc", out_name="chart_rdtsc_step.svg", unroll=8)
 
@@ -330,6 +411,8 @@ RENDERERS = {
     "rdtsc_step_mt": render_rdtsc_step_mt,
     "rdtscp_step": render_rdtscp_step,
     "rdtscp_step_mt": render_rdtscp_step_mt,
+    "rdtsc_drift": render_rdtsc_drift,
+    "rdtsc_drift_long": render_rdtsc_drift_long,
 }
 
 
