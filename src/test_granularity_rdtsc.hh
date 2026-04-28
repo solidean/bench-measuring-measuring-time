@@ -4,7 +4,6 @@
 #include "cycles.hh"
 #include "methods.hh"
 
-#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
@@ -23,9 +22,8 @@ inline void run_test_granularity_rdtsc(std::ofstream& csv)
     }
     double const inv_cps = 1.0 / cps;
 
-    using clk = std::chrono::steady_clock;
-    constexpr int target_samples = 10'000;
-    constexpr double budget_seconds = 1.0;
+    constexpr int max_samples = 10'000;
+    constexpr double max_secs = 1.0;
     constexpr uint64_t max_inner = 1'000'000'000ull;
 
     std::vector<stats_row> all_stats;
@@ -33,22 +31,18 @@ inline void run_test_granularity_rdtsc(std::ofstream& csv)
 
     for (auto const& m : time_methods())
     {
-        std::println("granularity_rdtsc: {}", m.name);
+        int const target = m.target_sample_count_for(max_samples, max_secs);
+        std::println("granularity_rdtsc: {} (target {} samples)", m.name, target);
         std::fflush(stdout);
 
         latencies_ns.clear();
-        latencies_ns.reserve(target_samples);
+        latencies_ns.reserve(target);
 
-        auto const wall_start = clk::now();
         uint64_t c_prev = cycles_now();
         uint64_t t_prev = m.now();
 
-        for (int i = 0; i < target_samples; ++i)
+        for (int i = 0; i < target; ++i)
         {
-            auto const elapsed = std::chrono::duration<double>(clk::now() - wall_start).count();
-            if (elapsed >= budget_seconds)
-                break;
-
             uint64_t t_cur = t_prev;
             uint64_t c_cur = c_prev;
             uint64_t inner = 0;

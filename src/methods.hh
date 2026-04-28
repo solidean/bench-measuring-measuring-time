@@ -2,6 +2,7 @@
 
 #include "cycles.hh"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <ctime>
@@ -33,6 +34,33 @@ struct TimeMethod
     char const* color;
     uint64_t (*now)();
     double scale_to_seconds;
+
+    // Two consecutive change observations, returning the second interval as
+    // a rough granularity estimate (in seconds). Cheap: ~2× the granularity.
+    double estimate_granularity_secs_rough() const
+    {
+        uint64_t const t0 = now();
+        uint64_t t1 = t0;
+        while (t1 == t0)
+            t1 = now();
+        uint64_t t2 = t1;
+        while (t2 == t1)
+            t2 = now();
+        return double(t2 - t1) * scale_to_seconds;
+    }
+
+    // Pick a sample budget that won't blow past `max_secs`, using the rough
+    // granularity estimate. Tests can then run a flat target_count loop with
+    // no per-iteration wall-clock check (which would otherwise distort fine
+    // clock measurements).
+    int target_sample_count_for(int max_samples, double max_secs) const
+    {
+        auto const g = estimate_granularity_secs_rough();
+        if (g <= 0)
+            return max_samples;
+        auto const by_time = static_cast<long long>(max_secs / g);
+        return int(std::min<long long>(max_samples, std::max<long long>(1, by_time)));
+    }
 };
 
 namespace bench_time
