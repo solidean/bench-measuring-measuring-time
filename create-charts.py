@@ -354,6 +354,55 @@ def render_rdtsc_drift(csv_path: Path):
     print(f"Saved {out.name}")
 
 
+def render_rdtsc_threads(csv_path: Path):
+    import matplotlib.colors as mcolors
+
+    out_dir = csv_path.parent
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    if df.empty:
+        print(f"{csv_path.name} has no data — skipping")
+        return
+
+    threads = sorted(df["thread"].unique())
+
+    rng = np.random.default_rng(seed=42)
+    hsv = np.column_stack([
+        rng.uniform(0.0, 1.0, len(threads)),
+        rng.uniform(0.6, 1.0, len(threads)),
+        rng.uniform(0.7, 1.0, len(threads)),
+    ])
+    colors = mcolors.hsv_to_rgb(hsv)
+
+    cycles_baseline = float(df["cycles"].min())
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    for i, t in enumerate(threads):
+        sub = df[df["thread"] == t]
+        ax.scatter(
+            sub["time_us"],
+            sub["cycles"] - cycles_baseline,
+            color=colors[i],
+            s=2,
+            alpha=0.6,
+        )
+
+    for spine in ("right", "top"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["left"].set_color(GRID)
+    ax.spines["bottom"].set_color(GRID)
+    ax.grid(True, color=GRID, linewidth=0.5)
+    ax.set_axisbelow(True)
+    ax.set_xlabel("Time since start of trimmed shared interval (μs)")
+    ax.set_ylabel(f"rdtsc value (relative to baseline = {cycles_baseline:.0f})")
+    ax.set_title(f"rdtsc absolute values across {len(threads)} threads (n = {len(df)})")
+
+    fig.tight_layout()
+    out = out_dir / "chart_rdtsc_threads.svg"
+    fig.savefig(out, format="svg", facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {out.name}")
+
+
 def render_rdtsc_drift_long(csv_path: Path):
     out_dir = csv_path.parent
     df = pd.read_csv(csv_path, keep_default_na=False)
@@ -413,6 +462,7 @@ RENDERERS = {
     "rdtscp_step_mt": render_rdtscp_step_mt,
     "rdtsc_drift": render_rdtsc_drift,
     "rdtsc_drift_long": render_rdtsc_drift_long,
+    "rdtsc_threads": render_rdtsc_threads,
 }
 
 

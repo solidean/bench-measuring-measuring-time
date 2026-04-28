@@ -6,6 +6,7 @@
 #include "test_rdtsc_drift_long.hh"
 #include "test_rdtsc_step.hh"
 #include "test_rdtsc_step_mt.hh"
+#include "test_rdtsc_threads.hh"
 #include "test_rdtscp_step.hh"
 #include "test_rdtscp_step_mt.hh"
 
@@ -125,6 +126,14 @@ int main(int argc, char** argv)
         run_test_rdtsc_drift(csv);
         csv.close();
         std::println("wrote {}", std::filesystem::absolute("result_rdtsc_drift.csv").string());
+    }
+
+    if (requested == "all" || requested == "rdtsc_threads")
+    {
+        std::ofstream csv("result_rdtsc_threads.csv");
+        run_test_rdtsc_threads(csv);
+        csv.close();
+        std::println("wrote {}", std::filesystem::absolute("result_rdtsc_threads.csv").string());
     }
 
     // long-running test, opt-in only — not run by "all"
